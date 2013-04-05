@@ -1,0 +1,8 @@
+name: AutoRefereeRMG
+main: org.mctourney.autoreferee.AutoRefereeRMG
+version: 0.1
+author: authorblues
+
+depend:
+  - AutoReferee
+  - WorldEdit
