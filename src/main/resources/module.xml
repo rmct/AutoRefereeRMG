@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<module protocol="1.0.0">
+  <authors>
+    <author>Author1</author>
+    <author>Author2</author>
+  </authors>
+  
+  <type>MIDDLE</type>
+  <difficulty>3</difficulty>
+</module>

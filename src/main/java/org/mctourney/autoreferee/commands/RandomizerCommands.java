@@ -2,6 +2,7 @@ package org.mctourney.autoreferee.commands;
 
 import java.io.IOException;
 import java.util.Date;
+import java.util.Random;
 
 import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
@@ -16,6 +17,7 @@ import org.mctourney.autoreferee.AutoRefMatch;
 import org.mctourney.autoreferee.AutoReferee;
 import org.mctourney.autoreferee.MapModule;
 import org.mctourney.autoreferee.RandomMatch;
+import org.mctourney.autoreferee.MapModule.ModuleType;
 import org.mctourney.autoreferee.util.NullChunkGenerator;
 import org.mctourney.autoreferee.util.commands.AutoRefCommand;
 import org.mctourney.autoreferee.util.commands.AutoRefPermission;
@@ -47,21 +49,16 @@ public class RandomizerCommands implements CommandHandler
 		String worldname = AutoReferee.WORLD_PREFIX + Long.toHexString(new Date().getTime());
 		WorldCreator creator = WorldCreator.name(worldname).generator(new NullChunkGenerator());
 
-		long seed = System.currentTimeMillis();
-		if (options.hasOption('s'))
-		{
-			// parse out the provided seed (numbers are converted verbatim)
-			seed = options.getOptionValue('s').hashCode();
-			try { seed = Long.parseLong(options.getOptionValue('s')); }
-			catch (NumberFormatException e) {  }
-		}
+		Random random = !options.hasOption('s') ? new Random()
+			: new Random(options.getOptionValue('s').hashCode());
 
 		// add the randomized map object
-		plugin.addMatch(new RandomMatch(Bukkit.createWorld(creator), seed, true));
+		plugin.addMatch(match = RandomMatch.generate(Bukkit.createWorld(creator), random));
+		if (sender instanceof Player) ((Player) sender).teleport(match.getWorldSpawn());
 		return true;
 	}
 
-	@AutoRefCommand(name={"autoref", "module", "save"}, argmin=1, argmax=1, options="f",
+	@AutoRefCommand(name={"autoref", "module", "save"}, argmin=1, argmax=1, options="fd+t+",
 		description="Save a ARM to the local module directory.")
 	@AutoRefPermission(console=false, nodes={"autoreferee.configure"})
 
@@ -72,17 +69,15 @@ public class RandomizerCommands implements CommandHandler
 		WorldEditPlugin worldedit = AutoReferee.getWorldEdit();
 
 		Selection selection = worldedit.getSelection(player);
-		Vector vmin = selection.getNativeMinimumPoint();
-		Vector vmax = selection.getNativeMaximumPoint();
+		Vector vmin = selection.getNativeMinimumPoint().setY(MapModule.MIN_Y);
+		Vector vmax = selection.getNativeMaximumPoint().setY(MapModule.MAX_Y);
 
-		vmin.setY(MapModule.MIN_Y);
-		vmax.setY(MapModule.MAX_Y);
-
-		CuboidClipboard clipboard = new CuboidClipboard(vmax.subtract(vmin).add(1,1,1), vmin, new Vector(0,0,0));
+		CuboidClipboard clipboard = new CuboidClipboard(vmax.subtract(vmin).add(1,1,1), vmin, vmin);
 		clipboard.copy(worldedit.createEditSession(player));
 
 		float pfacing = Math.round(player.getLocation().getYaw() / 90.0f) * 90.0f;
 		clipboard.rotate2D((int)(WORLDEDIT_BASE_ROTATION + MapModule.FORWARD_YAW - pfacing));
+		clipboard.setOffset(clipboard.getOrigin());
 
 		int w = clipboard.getWidth();
 		if (w > 20 && !options.hasOption('f'))
@@ -92,8 +87,13 @@ public class RandomizerCommands implements CommandHandler
 			return true;
 		}
 
-		MapModule module = new MapModule(args[0], clipboard);
-		module.save();
+		ModuleType type = ModuleType.MIDDLE;
+		if (options.hasOption('t')) type = ModuleType.valueOf(options.getOptionValue('t'));
+
+		MapModule module = new MapModule(args[0]);
+		if (type == null) module.setModuleType(type);
+		module.addAuthor(sender.getName());
+		module.save(clipboard);
 
 		sender.sendMessage("" + ChatColor.GREEN + module + " saved!");
 		return true;
