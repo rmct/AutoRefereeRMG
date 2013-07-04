@@ -11,6 +11,7 @@ import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;
 
 import com.sk89q.worldedit.CuboidClipboard;
+import com.sk89q.worldedit.CuboidClipboard.FlipDirection;
 import com.sk89q.worldedit.EditSession;
 import com.sk89q.worldedit.EditSessionFactory;
 import com.sk89q.worldedit.MaxChangedBlocksException;
@@ -22,6 +23,8 @@ import com.google.common.collect.Lists;
 
 public class RandomMatch extends AutoRefMatch
 {
+	private static final int DEFAULT_VOID_WIDTH = 16;
+
 	private class WorldGenerationTask extends BukkitRunnable
 	{
 		private Random random;
@@ -31,11 +34,18 @@ public class RandomMatch extends AutoRefMatch
 		private EditSession edit;
 
 		private int z = 0;
+		private int maxModuleWidth = 0;
 
-		public WorldGenerationTask(Random random, Iterator<MapModule> iter)
+		public WorldGenerationTask(Random random, List<MapModule> modules)
 		{
 			this.random = random;
-			this.iter = iter;
+			this.iter = modules.iterator();
+
+			for (MapModule module : modules)
+			{
+				if (module.getWidth() > maxModuleWidth)
+					maxModuleWidth = module.getWidth();
+			}
 
 			EditSessionFactory factory = WorldEdit.getInstance().getEditSessionFactory();
 			this.edit = factory.getEditSession(BukkitUtil.getLocalWorld(getWorld()), -1);
@@ -45,23 +55,46 @@ public class RandomMatch extends AutoRefMatch
 		@Override
 		public void run()
 		{
+
+			if (iter.hasNext()) copyNextModule();
+			else completeGeneration();
+		}
+
+		public void copyNextModule()
+		{
 			MapModule module = iter.next();
 			AutoRefereeRMG.log(RandomMatch.this + " using " + module, Level.INFO);
 
-			CuboidClipboard clipboard = module.getClipboard();
-			clipboard.setOffset(clipboard.getOrigin());
+			try
+			{
+				Vector pos = new Vector(0, MapModule.MIN_Y, z);
+				CuboidClipboard clipboard = module.getClipboard();
+				clipboard.setOffset(clipboard.getOrigin());
 
-			try { clipboard.place(this.edit, new Vector(0, MapModule.MIN_Y, z), true); }
+				Vector laneL = pos.setX( voidWidth / 2 + 1);
+				Vector laneR = pos.setX(-voidWidth / 2 - maxModuleWidth);
+
+				clipboard.place(this.edit, laneR, true);
+				clipboard.flip(FlipDirection.WEST_EAST);
+				clipboard.place(this.edit, laneL, true);
+
+				this.z += clipboard.getLength();
+			}
 			catch (MaxChangedBlocksException e) { e.printStackTrace(); }
+		}
 
-			this.z += clipboard.getLength();
-			if (!iter.hasNext()) this.cancel();
+		public void completeGeneration()
+		{
+			// TODO fix up AutoReferee configuration
+			this.cancel();
 		}
 	}
 
 	private Random random = null;
 
 	private WorldGenerationTask worldGenerationTask = null;
+
+	private int voidWidth = DEFAULT_VOID_WIDTH;
 
 	private RandomMatch(World world, Random random, boolean tmp)
 	{
@@ -86,17 +119,17 @@ public class RandomMatch extends AutoRefMatch
 		List<MapModule> modules = Lists.newArrayList(MapModule.getInstalledModules());
 
 		// swap elements to get the first N elements of the list
-		for (int i = 0; i < nummodules; ++i)
-			Collections.swap(modules, i, i + random.nextInt(nummodules - i));
+		for (int i = 0, msz = modules.size(); i < nummodules; ++i)
+			Collections.swap(modules, i, i + random.nextInt(msz - i));
 
 		// return the random match provided by the iterator of modules
-		return RandomMatch.generate(world, random, modules.subList(0, nummodules).iterator());
+		return RandomMatch.generate(world, random, modules.subList(0, nummodules));
 	}
 
-	public static RandomMatch generate(World world, Random random, Iterator<MapModule> iter)
+	public static RandomMatch generate(World world, Random random, List<MapModule> modules)
 	{
 		RandomMatch match = new RandomMatch(world, random, true);
-		match.worldGenerationTask = match.new WorldGenerationTask(random, iter);
+		match.worldGenerationTask = match.new WorldGenerationTask(random, modules);
 		match.worldGenerationTask.runTaskTimer(AutoRefereeRMG.getInstance(), 0L, 20L);
 		return match;
 	}

@@ -52,8 +52,11 @@ public class MapModule
 	private String slug;
 	private File module = null;
 
+	private Integer width = null;
+
 	private ModuleType type = ModuleType.MIDDLE;
 	private Set<String> authors = Sets.newHashSet();
+
 	private int difficulty = 3;
 
 	public MapModule(String slug)
@@ -113,11 +116,16 @@ public class MapModule
 		this.type = type;
 	}
 
+	public int getWidth()
+	{
+		return this.width == null ? 16 : this.width;
+	}
+
 	@Override
 	public String toString()
 	{
-		return String.format("%s[%s, t=%s]", this.getClass().getSimpleName(),
-			this.slug, this.type.name());
+		return String.format("%s[%s, w=%d, t=%s]", this.getClass().getSimpleName(),
+			this.slug, this.getWidth(), this.type.name());
 	}
 
 	@Override
@@ -141,6 +149,9 @@ public class MapModule
 
 		// add difficulty as an integer (1-5)
 		root.addContent(new Element("difficulty").setText(Integer.toString(difficulty)));
+
+		// set width of the module
+		root.addContent(new Element("width").setText(Integer.toString(width)));
 
 		// add the type of module (from the enum)
 		root.addContent(new Element("type").setText(type.name()));
@@ -181,6 +192,8 @@ public class MapModule
 			try { this.difficulty = Integer.parseInt(root.getChildTextNormalize("difficulty")); }
 			catch (NumberFormatException e) {  }
 
+			try { this.width = Integer.parseInt(root.getChildTextNormalize("width")); }
+			catch (NumberFormatException e) {  }
 
 			for (Element auth : root.getChild("authors").getChildren("author"))
 				this.addAuthor(auth.getTextNormalize());
@@ -203,6 +216,7 @@ public class MapModule
 		File tmp_schm = File.createTempFile("schm", null, PACKAGING_DIRECTORY);
 		File tmp_meta = File.createTempFile("meta", null, PACKAGING_DIRECTORY);
 
+		this.width = clipboard.getWidth();
 		this.saveMetadata(tmp_meta);
 		SchematicFormat.MCEDIT.save(clipboard, tmp_schm);
 
