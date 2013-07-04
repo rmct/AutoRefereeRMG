@@ -20,6 +20,7 @@ import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitUtil;
 
 import com.google.common.collect.Lists;
+import com.google.common.collect.Sets;
 
 public class RandomMatch extends AutoRefMatch
 {
@@ -131,6 +132,13 @@ public class RandomMatch extends AutoRefMatch
 		RandomMatch match = new RandomMatch(world, random, true);
 		match.worldGenerationTask = match.new WorldGenerationTask(random, modules);
 		match.worldGenerationTask.runTaskTimer(AutoRefereeRMG.getInstance(), 0L, 20L);
+
+		// add all appropriate authors
+		match.mapAuthors = Sets.newHashSet();
+		for (MapModule module : modules)
+			match.mapAuthors.addAll(module.getAuthors());
+
+		match.mapName = "AutoRefereeRMG";
 		return match;
 	}
 }
