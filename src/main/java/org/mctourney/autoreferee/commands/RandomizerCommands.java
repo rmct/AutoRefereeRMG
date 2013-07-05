@@ -58,7 +58,7 @@ public class RandomizerCommands implements CommandHandler
 		return true;
 	}
 
-	@AutoRefCommand(name={"autoref", "module", "save"}, argmin=1, argmax=1, options="fd+t+",
+	@AutoRefCommand(name={"autoref", "module", "save"}, argmin=1, argmax=1, options="fd+t+a+",
 		description="Save a ARM to the local module directory.")
 	@AutoRefPermission(console=false, nodes={"autoreferee.configure"})
 
@@ -91,10 +91,17 @@ public class RandomizerCommands implements CommandHandler
 		if (options.hasOption('t')) type = ModuleType.valueOf(options.getOptionValue('t'));
 
 		MapModule module = new MapModule(args[0]);
-		if (type == null) module.setModuleType(type);
-		module.addAuthor(sender.getName());
-		module.save(clipboard);
+		if (type != null) module.setModuleType(type);
 
+		// add authors
+		if (options.hasOption('a'))
+			module.addAuthor(options.getOptionValue('a'));
+		else if (match != null)
+			for (String author : match.getMapAuthors())
+				module.addAuthor(author);
+		else module.addAuthor(sender.getName());
+
+		module.save(clipboard);
 		sender.sendMessage("" + ChatColor.GREEN + module + " saved!");
 		return true;
 	}

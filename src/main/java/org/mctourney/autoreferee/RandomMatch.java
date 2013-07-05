@@ -6,9 +6,11 @@ import java.util.List;
 import java.util.Random;
 import java.util.logging.Level;
 
+import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.World;
 import org.bukkit.scheduler.BukkitRunnable;
+import org.mctourney.autoreferee.regions.CuboidRegion;
 
 import com.sk89q.worldedit.CuboidClipboard;
 import com.sk89q.worldedit.CuboidClipboard.FlipDirection;
@@ -35,7 +37,6 @@ public class RandomMatch extends AutoRefMatch
 		private EditSession edit;
 
 		private int z = 0;
-		private int maxModuleWidth = 0;
 
 		public WorldGenerationTask(Random random, List<MapModule> modules)
 		{
@@ -65,6 +66,7 @@ public class RandomMatch extends AutoRefMatch
 		{
 			MapModule module = iter.next();
 			AutoRefereeRMG.log(RandomMatch.this + " using " + module, Level.INFO);
+			AutoRefTeam teamL = getTeam("Left"), teamR = getTeam("Right");
 
 			try
 			{
@@ -72,12 +74,23 @@ public class RandomMatch extends AutoRefMatch
 				CuboidClipboard clipboard = module.getClipboard();
 				clipboard.setOffset(clipboard.getOrigin());
 
-				Vector laneL = pos.setX( voidWidth / 2 + 1);
-				Vector laneR = pos.setX(-voidWidth / 2 - maxModuleWidth);
+				// TODO center the lanes around x=16 and x=-16, respectively, for symmetry with start platform
+				Vector laneL = pos.setX( voidWidth / 2 + (maxModuleWidth - module.getWidth()) / 2);
+				Vector laneR = pos.setX(-voidWidth / 2 - (maxModuleWidth + module.getWidth()) / 2);
 
 				clipboard.place(this.edit, laneR, true);
 				clipboard.flip(FlipDirection.WEST_EAST);
 				clipboard.place(this.edit, laneL, true);
+
+				teamL.addRegion(new CuboidRegion(
+					BukkitUtil.toLocation(getWorld(), laneL),
+					BukkitUtil.toLocation(getWorld(), laneL.add(clipboard.getSize()).subtract(1,1,1))
+				));
+
+				teamR.addRegion(new CuboidRegion(
+					BukkitUtil.toLocation(getWorld(), laneR),
+					BukkitUtil.toLocation(getWorld(), laneR.add(clipboard.getSize()).subtract(1,1,1))
+				));
 
 				this.z += clipboard.getLength();
 			}
@@ -86,7 +99,6 @@ public class RandomMatch extends AutoRefMatch
 
 		public void completeGeneration()
 		{
-			// TODO fix up AutoReferee configuration
 			this.cancel();
 		}
 	}
@@ -96,6 +108,7 @@ public class RandomMatch extends AutoRefMatch
 	private WorldGenerationTask worldGenerationTask = null;
 
 	private int voidWidth = DEFAULT_VOID_WIDTH;
+	private int maxModuleWidth = 0;
 
 	private RandomMatch(World world, Random random, boolean tmp)
 	{
@@ -140,5 +153,12 @@ public class RandomMatch extends AutoRefMatch
 
 		match.mapName = "AutoRefereeRMG";
 		return match;
+	}
+
+	@Override
+	protected void loadWorldConfiguration()
+	{
+		this.teams.add(AutoRefTeam.create(this, "Left", ChatColor.BLUE));
+		this.teams.add(AutoRefTeam.create(this, "Right", ChatColor.RED));
 	}
 }
