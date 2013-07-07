@@ -1,0 +1,40 @@
+<map protocol="2.0.0">
+  <teams>
+    <team color="BLUE">
+      <name>Left</name>
+      <spawn>
+        <location pos="14,75,-18" yaw="0" />
+      </spawn>
+    </team>
+    <team color="RED">
+      <name>Right</name>
+      <spawn>
+        <location pos="-15,75,-18" yaw="0" />
+      </spawn>
+    </team>
+  </teams>
+  <startregion spawn="0,75,-30,0">
+    <cuboid min="-24,72,-48" max="23,84,-16" />
+  </startregion>
+  <regions>
+    <cuboid min="-24,0,-17" max="-9,256,-1">
+      <owner>Right</owner>
+    </cuboid>
+    <cuboid min="8,0,-17" max="23,256,-1">
+      <owner>Left</owner>
+    </cuboid>
+  </regions>
+  <goals>
+    <teamgoals team="Left" />
+    <teamgoals team="Right" />
+  </goals>
+  <mechanisms>
+    <lever pos="9,75,-16">true</lever>
+    <lever pos="-1,72,-18">false</lever>
+    <lever pos="-10,75,-16">true</lever>
+  </mechanisms>
+  <gameplay>
+    <clockstart>8am</clockstart>
+  </gameplay>
+  <protect />
+</map>

@@ -54,7 +54,7 @@ public class RandomizerCommands implements CommandHandler
 
 		// add the randomized map object
 		plugin.addMatch(match = RandomMatch.generate(Bukkit.createWorld(creator), random));
-		if (sender instanceof Player) ((Player) sender).teleport(match.getWorldSpawn());
+		if (sender instanceof Player) match.joinMatch((Player) sender);
 		return true;
 	}
 

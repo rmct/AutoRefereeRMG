@@ -1,14 +1,20 @@
 package org.mctourney.autoreferee;
 
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 import java.util.logging.Level;
 
-import org.bukkit.ChatColor;
+import org.apache.commons.io.FileUtils;
 import org.bukkit.Location;
 import org.bukkit.World;
+import org.bukkit.block.Biome;
+import org.bukkit.entity.Player;
 import org.bukkit.scheduler.BukkitRunnable;
 import org.mctourney.autoreferee.regions.CuboidRegion;
 
@@ -20,6 +26,8 @@ import com.sk89q.worldedit.MaxChangedBlocksException;
 import com.sk89q.worldedit.Vector;
 import com.sk89q.worldedit.WorldEdit;
 import com.sk89q.worldedit.bukkit.BukkitUtil;
+import com.sk89q.worldedit.data.DataException;
+import com.sk89q.worldedit.schematic.SchematicFormat;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
@@ -33,14 +41,17 @@ public class RandomMatch extends AutoRefMatch
 		private Random random;
 
 		private Iterator<MapModule> iter;
+		private int m = 0, modulecount;
 
 		private EditSession edit;
+		private boolean needstart = true;
 
 		private int z = 0;
 
 		public WorldGenerationTask(Random random, List<MapModule> modules)
 		{
 			this.random = random;
+			this.modulecount = modules.size();
 			this.iter = modules.iterator();
 
 			for (MapModule module : modules)
@@ -57,17 +68,25 @@ public class RandomMatch extends AutoRefMatch
 		@Override
 		public void run()
 		{
+			if (!needstart)
+			{
+				if (iter.hasNext()) copyNextModule();
+				else completeGeneration();
+			}
+			else copyStartPlatform();
 
-			if (iter.hasNext()) copyNextModule();
-			else completeGeneration();
+			int c = 100 * m / modulecount;
+			if (waitingPlayers != null) for (Player p : waitingPlayers)
+				p.sendMessage(String.format("%s: %d%% loaded", getMapName(), c));
 		}
 
 		public void copyNextModule()
 		{
-			MapModule module = iter.next();
+			MapModule module = iter.next(); ++m;
 			AutoRefereeRMG.log(RandomMatch.this + " using " + module, Level.INFO);
 			AutoRefTeam teamL = getTeam("Left"), teamR = getTeam("Right");
 
+			World world = getWorld();
 			try
 			{
 				Vector pos = new Vector(0, MapModule.MIN_Y, z);
@@ -77,20 +96,28 @@ public class RandomMatch extends AutoRefMatch
 				// TODO center the lanes around x=16 and x=-16, respectively, for symmetry with start platform
 				Vector laneL = pos.setX( voidWidth / 2 + (maxModuleWidth - module.getWidth()) / 2);
 				Vector laneR = pos.setX(-voidWidth / 2 - (maxModuleWidth + module.getWidth()) / 2);
+				Vector v = clipboard.getSize();
 
-				clipboard.place(this.edit, laneR, true);
+				clipboard.place(this.edit, laneR, false);
 				clipboard.flip(FlipDirection.WEST_EAST);
-				clipboard.place(this.edit, laneL, true);
+				clipboard.place(this.edit, laneL, false);
 
 				teamL.addRegion(new CuboidRegion(
-					BukkitUtil.toLocation(getWorld(), laneL),
-					BukkitUtil.toLocation(getWorld(), laneL.add(clipboard.getSize()).subtract(1,1,1))
+					BukkitUtil.toLocation(world, laneL),
+					BukkitUtil.toLocation(world, laneL.add(v).subtract(1,1,1))
 				));
 
 				teamR.addRegion(new CuboidRegion(
-					BukkitUtil.toLocation(getWorld(), laneR),
-					BukkitUtil.toLocation(getWorld(), laneR.add(clipboard.getSize()).subtract(1,1,1))
+					BukkitUtil.toLocation(world, laneR),
+					BukkitUtil.toLocation(world, laneR.add(v).subtract(1,1,1))
 				));
+
+				for (int x = 0; x < v.getBlockX(); ++x)
+				for (int z = 0; z < v.getBlockZ(); ++z)
+				{
+					world.setBiome(laneL.getBlockX() + x, laneL.getBlockZ() + z, Biome.PLAINS);
+					world.setBiome(laneR.getBlockX() + x, laneR.getBlockZ() + z, Biome.PLAINS);
+				}
 
 				this.z += clipboard.getLength();
 			}
@@ -99,7 +126,46 @@ public class RandomMatch extends AutoRefMatch
 
 		public void completeGeneration()
 		{
+			World w = getWorld();
+
+			// bring players who are waiting, remove waiting list
+			for (Player p : waitingPlayers) p.teleport(getWorldSpawn());
+			waitingPlayers = null;
+
 			this.cancel();
+		}
+
+		public void copyStartPlatform()
+		{
+			needstart = false;
+			World world = getWorld();
+			File tmp_schm = null;
+
+			try
+			{
+				tmp_schm = File.createTempFile("start", null, FileUtils.getTempDirectory());
+				InputStream start_strm = AutoRefereeRMG.getInstance().getResource("worldbase/start.schematic");
+				FileUtils.copyInputStreamToFile(start_strm, tmp_schm);
+
+				Vector origin = new Vector(0, 64, 0);
+				CuboidClipboard clipboard = SchematicFormat.MCEDIT.load(tmp_schm);
+				clipboard.paste(this.edit, origin, false, true);
+
+				Vector min = origin.add(clipboard.getOffset());
+				Vector v = clipboard.getSize();
+
+				for (int x = 0; x < v.getBlockX(); ++x)
+				for (int z = 0; z < v.getBlockZ(); ++z)
+					world.setBiome(min.getBlockX() + x, min.getBlockZ() + z, Biome.PLAINS);
+			}
+			catch (DataException e) { e.printStackTrace(); }
+			catch (MaxChangedBlocksException e) { e.printStackTrace(); }
+			catch (IOException e) { e.printStackTrace(); }
+			finally
+			{
+				if (tmp_schm != null) FileUtils.deleteQuietly(tmp_schm);
+				loadBaseWorldConfiguration();
+			}
 		}
 	}
 
@@ -109,6 +175,8 @@ public class RandomMatch extends AutoRefMatch
 
 	private int voidWidth = DEFAULT_VOID_WIDTH;
 	private int maxModuleWidth = 0;
+
+	private Set<Player> waitingPlayers = Sets.newHashSet();
 
 	private RandomMatch(World world, Random random, boolean tmp)
 	{
@@ -144,7 +212,7 @@ public class RandomMatch extends AutoRefMatch
 	{
 		RandomMatch match = new RandomMatch(world, random, true);
 		match.worldGenerationTask = match.new WorldGenerationTask(random, modules);
-		match.worldGenerationTask.runTaskTimer(AutoRefereeRMG.getInstance(), 0L, 20L);
+		match.worldGenerationTask.runTaskTimer(AutoRefereeRMG.getInstance(), 5L, 5L);
 
 		// add all appropriate authors
 		match.mapAuthors = Sets.newHashSet();
@@ -155,10 +223,21 @@ public class RandomMatch extends AutoRefMatch
 		return match;
 	}
 
+	private void loadBaseWorldConfiguration()
+	{
+		InputStream basexml = AutoRefereeRMG.getInstance().getResource("worldbase/autoreferee.xml");
+		loadWorldConfiguration(basexml);
+	}
+
 	@Override
 	protected void loadWorldConfiguration()
 	{
-		this.teams.add(AutoRefTeam.create(this, "Left", ChatColor.BLUE));
-		this.teams.add(AutoRefTeam.create(this, "Right", ChatColor.RED));
+	}
+
+	@Override
+	public void joinMatch(Player player)
+	{
+		if (waitingPlayers == null) super.joinMatch(player);
+		else waitingPlayers.add(player);
 	}
 }

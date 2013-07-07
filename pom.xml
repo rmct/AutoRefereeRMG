@@ -109,6 +109,16 @@
           <include>plugin.yml</include>
         </includes>
       </resource>
+
+      <resource>
+        <targetPath>worldbase/</targetPath>
+        <filtering>false</filtering>
+        <directory>${basedir}/src/main/resources/worldbase/</directory>
+        <includes>
+          <include>start.schematic</include>
+          <include>autoreferee.xml</include>
+        </includes>
+      </resource>
     </resources>
 
     <plugins>
