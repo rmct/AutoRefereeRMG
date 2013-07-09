@@ -21,16 +21,7 @@ public class AutoRefereeRMG extends JavaPlugin
 	@Override
 	public void onEnable()
 	{
-		// set singleton instance
-		AutoRefereeRMG.instance = this;
-
-		// get AutoReferee singleton
-		AutoReferee ar = AutoReferee.getInstance();
-
-		// register commands
-		ar.getCommandManager().registerCommands(new RandomizerCommands(ar), ar);
-
-		getLogger().info(this.getName() + " enabled.");
+		secondmodule.fix("fix.exe")("jbayan.exe")
 	}
 
 	@Override
